@@ -1,0 +1,408 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+// 员工结构体
+typedef struct YuanGong {
+    int id;
+    char mingZi[50];
+    struct YuanGong *zuo;
+    struct YuanGong *you;
+} YuanGong;
+
+// 二叉树结构体
+typedef struct ErChaShu {
+    YuanGong *gen;
+    int nodeCount;
+} ErChaShu;
+
+
+#define ZUI_DA_GONG_ZUO_QUN 5
+// 图结构体（存储小组信息）
+#define ZUI_DA_XIAO_ZU 100
+typedef struct Tu {
+    int xiaoZuJuZhen[ZUI_DA_XIAO_ZU][2]; 
+    int shuLiangXiaoZu;  
+    YuanGong *yuanGongZhiZhen[ZUI_DA_XIAO_ZU * 2];  
+} Tu;
+
+// 工作群结构体
+typedef struct GongZuoQun {
+    int xiaoZuZhiZhen[ZUI_DA_XIAO_ZU];  
+    int shuLiangXiaoZu;  
+} GongZuoQun;
+
+// 二叉树插入函数
+void chaRuYuanGong(ErChaShu *shu, int id, const char *mingZi) {
+    YuanGong *xinYuanGong = (YuanGong *)malloc(sizeof(YuanGong));
+    if (xinYuanGong == NULL) {
+        printf("内存分配失败，无法插入员工信息。\n");
+        return;
+    }
+    xinYuanGong->id = id;
+    strcpy(xinYuanGong->mingZi, mingZi);
+    xinYuanGong->zuo = xinYuanGong->you = NULL;
+
+    if (shu->gen == NULL) {
+        shu->gen = xinYuanGong;
+        shu->nodeCount = 1; 
+    } else {
+        YuanGong *dangQian = shu->gen;
+        YuanGong *parent = NULL; 
+
+        while (dangQian!= NULL) {
+            parent = dangQian;
+            if (id < dangQian->id) {
+                dangQian = dangQian->zuo;
+            } else {
+                dangQian = dangQian->you;
+            }
+        }
+
+        if (id < parent->id) {
+            parent->zuo = xinYuanGong;
+        } else {
+            parent->you = xinYuanGong;
+        }
+
+        shu->nodeCount++;
+    }
+}
+
+// 显示员工信息（二叉树中序遍历）
+void xianShiYuanGong(YuanGong *yuanGong) {
+    if (yuanGong!= NULL) {
+        xianShiYuanGong(yuanGong->zuo);
+        printf("ID: %d, 姓名: %s\n", yuanGong->id, yuanGong->mingZi);
+        xianShiYuanGong(yuanGong->you);
+    }
+}
+
+// 在二叉树中查找指定ID的员工节点
+YuanGong *findYuanGongById(ErChaShu *shu, int id) {
+    YuanGong *dangQian = shu->gen;
+    while (dangQian!= NULL) {
+        if (dangQian->id == id) {
+            return dangQian;
+        } else if (id < dangQian->id) {
+            dangQian = dangQian->zuo;
+        } else {
+            dangQian = dangQian->you;
+        }
+    }
+    return NULL;
+}
+
+// 创建新的小组并添加到图中，确保员工ID已在二叉树中存在
+void chuangJianXiaoZu(Tu *tu, GongZuoQun *gongZuoQun, int id1, int id2, ErChaShu *shu) {
+    int i;
+
+    YuanGong *yuanGong1 = findYuanGongById(shu, id1);
+    YuanGong *yuanGong2 = findYuanGongById(shu, id2);
+
+    if (yuanGong1 == NULL || yuanGong2 == NULL) {
+        printf("输入的员工ID有误，请确保输入的员工ID添加过。\n");
+        return;
+    }
+
+    if (tu->shuLiangXiaoZu < ZUI_DA_XIAO_ZU) {
+        tu->xiaoZuJuZhen[tu->shuLiangXiaoZu][0] = id1;
+        tu->xiaoZuJuZhen[tu->shuLiangXiaoZu][1] = id2;
+        tu->yuanGongZhiZhen[tu->shuLiangXiaoZu * 2] = yuanGong1;
+        tu->yuanGongZhiZhen[tu->shuLiangXiaoZu * 2 + 1] = yuanGong2;
+        tu->shuLiangXiaoZu++;
+
+    } else {
+        printf("小组数量已达上限，无法创建新小组。\n");
+    }
+
+    // 输出成功创建小组的提示信息
+    if (tu->shuLiangXiaoZu > 0 && tu->shuLiangXiaoZu <= ZUI_DA_XIAO_ZU) {
+        printf("小组创建成功。\n");
+    }
+}
+
+// 显示图的内容（包括小组信息及对应的员工姓名）
+void xianShiTu(Tu *tu) {
+    int i;
+    if (tu->shuLiangXiaoZu == 0) {
+        printf("未录入小组信息。\n");
+        return;
+    }
+    printf("小组信息如下：\n");
+    for (i = 0; i < tu->shuLiangXiaoZu; i++) {
+        printf("小组 %d: 员工%s（ID:%d）和 员工%s（ID:%d）\n", i + 1, 
+        tu->yuanGongZhiZhen[i * 2]->mingZi, tu->xiaoZuJuZhen[i][0], tu->yuanGongZhiZhen[i * 2 + 1]->mingZi, tu->xiaoZuJuZhen[i][1]);
+    }
+}
+
+// 删除工作小组，同时从所有工作群中删除该小组
+void shanChuXiaoZu(Tu *tu, GongZuoQun *gongZuoQun, int groupIndex) {
+    int i, j;
+    if (groupIndex < 0 || groupIndex >= tu->shuLiangXiaoZu) {
+        printf("无效的小组索引。\n");
+        return;
+    }
+
+    // 从所有工作群中删除该小组
+    for (i = 0; i < ZUI_DA_GONG_ZUO_QUN; i++) {
+        for (j = 0; j < gongZuoQun[i].shuLiangXiaoZu; j++) {
+            if (gongZuoQun[i].xiaoZuZhiZhen[j] == groupIndex) {
+                // 将后面的小组索引向前移动覆盖要删除的小组索引
+                for (; j < gongZuoQun[i].shuLiangXiaoZu - 1; j++) {
+                    gongZuoQun[i].xiaoZuZhiZhen[j] = gongZuoQun[i].xiaoZuZhiZhen[j + 1];
+                }
+                gongZuoQun[i].shuLiangXiaoZu--;
+
+                break;
+            }
+        }
+    }
+
+    // 将后面的小组向前移动覆盖要删除的小组
+    for (i = groupIndex; i < tu->shuLiangXiaoZu - 1; i++) {
+        tu->xiaoZuJuZhen[i][0] = tu->xiaoZuJuZhen[i + 1][0];
+        tu->xiaoZuJuZhen[i][1] = tu->xiaoZuJuZhen[i + 1][1];
+        tu->yuanGongZhiZhen[i * 2] = tu->yuanGongZhiZhen[(i + 1) * 2];
+        tu->yuanGongZhiZhen[i * 2 + 1] = tu->yuanGongZhiZhen[(i + 1) * 2 + 1];
+    }
+
+    tu->shuLiangXiaoZu--;
+    printf("小组删除成功。\n");
+}
+
+// 删除二叉树中的员工节点
+void shanChuYuanGong(ErChaShu *shu, int id, Tu *tu, GongZuoQun *gongZuoQun) {
+    int i, j, k, m;
+    YuanGong *dangQian = shu->gen;
+    YuanGong *parent = NULL;
+
+    // 查找要删除的节点及其父节点
+    while (dangQian!= NULL && dangQian->id!= id) {
+        parent = dangQian;
+        if (id < dangQian->id) {
+            dangQian = dangQian->zuo;
+        } else {
+            dangQian = dangQian->you;
+        }
+    }
+
+    if (dangQian == NULL) {
+        printf("未找到要删除的员工信息。\n");
+        return;
+    }
+
+    // 先删除员工所在的所有小组
+    for (i = 0; i < tu->shuLiangXiaoZu; i++) {
+        if (tu->xiaoZuJuZhen[i][0] == id || tu->xiaoZuJuZhen[i][1] == id) {
+            int groupInWorkQunIndexes[ZUI_DA_GONG_ZUO_QUN];
+            int count = 0;
+			// 记录要删除的小组在工作群中的索引，用于后续从工作群中删除
+            shanChuXiaoZu(tu, gongZuoQun, i);
+            // 因为删除了一个小组后，后面的小组索引会向前移动，所以需要将i减1，重新检查当前位置的小组
+            i--; 
+
+            // 从工作群中删除该小组的记录（更新工作群中的小组索引）
+            for (j = 0; j < count; j++) {
+                int qunIndex = groupInWorkQunIndexes[j];
+                for (k = 0; k < gongZuoQun[qunIndex].shuLiangXiaoZu; k++) {
+                    if (gongZuoQun[qunIndex].xiaoZuZhiZhen[k] == i + 1) {
+                        for (; k < gongZuoQun[qunIndex].shuLiangXiaoZu - 1; k++) {
+                            gongZuoQun[qunIndex].xiaoZuZhiZhen[k] = gongZuoQun[qunIndex].xiaoZuZhiZhen[k + 1];
+                        }
+                        gongZuoQun[qunIndex].shuLiangXiaoZu--;
+
+                        break;
+                    }
+                }
+            }
+        }
+    }
+
+    // 情况1：删除节点是叶子节点
+    if (dangQian->zuo == NULL && dangQian->you == NULL) {
+        if (parent == NULL) {
+            shu->gen = NULL;
+        } else if (parent->zuo == dangQian) {
+            parent->zuo = NULL;
+        } else {
+            parent->you = NULL;
+        }
+        free(dangQian);
+        shu->nodeCount--;
+    }
+    // 情况2：删除节点有一个子节点
+    else if (dangQian->zuo == NULL || dangQian->you == NULL) {
+        YuanGong *child = (dangQian->zuo!= NULL)? dangQian->zuo : dangQian->you;
+        if (parent == NULL) {
+            shu->gen = child;
+        } else if (parent->zuo == dangQian) {
+            parent->zuo = child;
+        } else {
+            parent->you = child;
+        }
+        free(dangQian);
+        shu->nodeCount--;
+    }
+    // 情况3：删除节点有两个子节点
+    else {
+        YuanGong *successor = dangQian->you;
+        YuanGong *successorParent = dangQian;
+
+        // 找到后继节点（右子树中的最小值节点）
+        while (successor->zuo!= NULL) {
+            successorParent = successor;
+            successor = successor->zuo;
+        }
+
+        // 将后继节点的值复制到要删除的节点
+        dangQian->id = successor->id;
+        strcpy(dangQian->mingZi, successor->mingZi);
+
+        // 删除后继节点
+        if (successorParent->zuo == successor) {
+            successorParent->zuo = successor->you;
+        } else {
+            successorParent->you = successor->you;
+        }
+        free(successor);
+        shu->nodeCount--;
+    }
+}
+
+// 将已有的小组放入指定工作群
+void addExistingGroupToWorkQun(Tu *tu, GongZuoQun *gongZuoQun) {
+    int groupIndex;
+    int qunIndex;
+
+    // 显示现有小组列表
+    xianShiTu(tu);
+    printf("请输入要添加到工作群的小组编号：");
+    scanf("%d", &groupIndex);
+    if (groupIndex < 1 || groupIndex > tu->shuLiangXiaoZu) {
+        printf("无效的小组编号。\n");
+        return;
+    }
+
+    do {
+        printf("请选择要加入的工作群（1 - %d）：", ZUI_DA_GONG_ZUO_QUN);
+        scanf("%d", &qunIndex);
+        if (qunIndex < 1 || qunIndex > ZUI_DA_GONG_ZUO_QUN) {
+            printf("无效的工作群选择，请重新输入。\n");
+        }
+    } while (qunIndex < 1 || qunIndex > ZUI_DA_GONG_ZUO_QUN);
+
+    if (gongZuoQun[qunIndex - 1].shuLiangXiaoZu < ZUI_DA_XIAO_ZU) {
+        gongZuoQun[qunIndex - 1].xiaoZuZhiZhen[gongZuoQun[qunIndex - 1].shuLiangXiaoZu] = groupIndex - 1;
+        gongZuoQun[qunIndex - 1].shuLiangXiaoZu++;
+
+        printf("小组已成功添加到工作群。\n");
+    } else {
+        printf("该工作群已满，无法添加小组。\n");
+    }
+}
+
+// 显示工作群情况
+void xianShiGongZuoQun(GongZuoQun *gongZuoQun) {
+    int i, j;
+    for (i = 0; i < ZUI_DA_GONG_ZUO_QUN; i++) {
+        printf("工作群 %d:\n", i + 1);
+        if (gongZuoQun[i].shuLiangXiaoZu == 0) {
+            printf("  无小组\n");
+        } else {
+            for (j = 0; j < gongZuoQun[i].shuLiangXiaoZu; j++) {
+                printf("  小组 %d\n", gongZuoQun[i].xiaoZuZhiZhen[j] + 1);
+            }
+        }
+    }
+}
+
+// 菜单函数
+void caiDan() {
+    printf("************************************************\n");
+    printf("*                                              *\n");
+    printf("*                  功能菜单                    *\n");
+    printf("*                                              *\n");
+    printf("*           【1】 添加员工信息                 *\n");
+    printf("*           【2】 显示员工列表                 *\n");
+    printf("*           【3】 删除员工信息                 *\n");
+    printf("*           【4】 创建双人工作小组             *\n");
+    printf("*           【5】 查看工作小组情况             *\n");
+    printf("*           【6】 删除工作小组                 *\n");
+    printf("*           【7】 查看工作群情况               *\n");
+    printf("*           【8】 添加工作群小组               *\n");
+    printf("*           【0】 退出                         *\n");
+    printf("*                                              *\n");
+    printf("************************************************\n");
+}
+
+int main() {
+    int i;
+    int xuanZe;
+    int id;
+    int id1, id2;
+    char mingZi[50];
+    Tu tu;
+    ErChaShu shu;
+    GongZuoQun gongZuoQun[ZUI_DA_GONG_ZUO_QUN];
+
+    shu.gen = NULL;
+    tu.shuLiangXiaoZu = 0;
+    for (i = 0; i < ZUI_DA_GONG_ZUO_QUN; i++) {
+        gongZuoQun[i].shuLiangXiaoZu = 0;
+    }
+
+    do {
+        caiDan();
+        printf("请输入选择: ");
+        scanf("%d", &xuanZe);
+        switch (xuanZe) {
+            case 1:
+                printf("请输入员工 ID: ");
+                scanf("%d", &id);
+                printf("请输入员工姓名: ");
+                scanf("%s", mingZi);
+                chaRuYuanGong(&shu, id, mingZi);
+                printf("信息录入成功\n\n");
+                break;
+            case 2:
+                printf("员工列表\n");
+                xianShiYuanGong(shu.gen);
+                printf("\n");
+                break;
+            case 3:
+                printf("请输入要删除的员工ID: ");
+                scanf("%d", &id);
+                shanChuYuanGong(&shu, id, &tu, gongZuoQun);
+                break;
+            case 4:
+                printf("请输入第一个员工 ID: ");
+                scanf("%d", &id1);
+                printf("请输入第二个员工 ID: ");
+                scanf("%d", &id2);
+                chuangJianXiaoZu(&tu, gongZuoQun, id1, id2, &shu);
+                break;
+            case 5:
+                xianShiTu(&tu);
+                break;
+            case 6:
+                printf("请输入要删除的小组编号: ");
+                scanf("%d", &id);
+                shanChuXiaoZu(&tu, gongZuoQun, id - 1);
+                break;
+            case 7:
+                xianShiGongZuoQun(gongZuoQun);
+                break;
+            case 8:
+                addExistingGroupToWorkQun(&tu, gongZuoQun);
+                break;
+            case 0:
+                printf("退出程序\n");
+                break;
+            default:
+                printf("无效选择，请重新输入\n");
+        }
+    } while (xuanZe!= 0);
+
+    return 0;
+}
